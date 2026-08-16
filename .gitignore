@@ -1,0 +1,17 @@
+# SQLite Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Local cache & temp
+.hermes/
+/tmp/
+*.log
