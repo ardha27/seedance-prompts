@@ -3,17 +3,20 @@
 Seedance prompt scraper — fetches community prompts from bestseedanceprompts.com
 and stores them in a local SQLite DB with FTS5 search.
 
+Auto-pushes updated stats & scripts to GitHub when new prompts are added.
+
 Usage:
   python3 seedance_scraper.py full    # Scrape all (initial setup)
   python3 seedance_scraper.py update  # Only fetch new prompts (cron mode)
 """
 
-import urllib.request, re, json, time, sqlite3, os, sys
+import urllib.request, re, json, time, sqlite3, os, sys, subprocess
 import html as htmlmod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE = 'https://bestseedanceprompts.com'
 DB_PATH = os.path.expanduser('~/.hermes/data/seedance_prompts.db')
+REPO_DIR = '/home/rishua/seedance-prompts'
 
 
 def init_db():
@@ -82,7 +85,6 @@ def fetch_detail(card_url):
         if m:
             prompt_text = re.sub(r'<[^>]+>', ' ', m.group(1)).strip()
             prompt_text = re.sub(r'\s+', ' ', htmlmod.unescape(prompt_text))
-            # Clean leaked metadata (Author/Published/Source/Categories)
             prompt_text = re.split(r'\s*Author\s+', prompt_text)[0].strip()
             detail['original_prompt'] = prompt_text
         
@@ -178,6 +180,71 @@ def upsert_to_db(conn, detail):
     return True
 
 
+def auto_push_github(new_count, total_count):
+    """Auto-commit and push stats to GitHub if new prompts were added."""
+    if not os.path.exists(REPO_DIR):
+        return
+    
+    gh_config = os.path.expanduser('~/.config/gh/hosts.yml')
+    if not os.path.exists(gh_config):
+        return
+    with open(gh_config) as f:
+        content = f.read()
+    
+    user_m = re.search(r'user:\s*(\S+)', content)
+    token_m = re.search(r'oauth_token:\s*(\S+)', content)
+    if not user_m or not token_m:
+        return
+    
+    user, token = user_m.group(1), token_m.group(1)
+    
+    # Update README.md stats
+    readme_path = os.path.join(REPO_DIR, 'README.md')
+    if os.path.exists(readme_path):
+        with open(readme_path, 'r', encoding='utf-8') as f:
+            text = f.read()
+        text = re.sub(r'prompts-\d+.*?-111', f'prompts-{total_count}%2B-111', text)
+        text = re.sub(r'<b>\d+.*?\+ real community', f'<b>{total_count:,}+ real community', text)
+        text = re.sub(r'\| \*\*Total Prompts\*\* \| \*\*[\d,]+\*\*', f'| **Total Prompts** | **{total_count:,}**', text)
+        with open(readme_path, 'w', encoding='utf-8') as f:
+            f.write(text)
+    
+    # Sync SKILL.md
+    skill_src = os.path.expanduser('~/.hermes/skills/ai-automation/seedance-prompts/SKILL.md')
+    if os.path.exists(skill_src):
+        with open(skill_src, 'r', encoding='utf-8') as f:
+            stext = f.read()
+        stext = re.sub(r'\*\*\d+\+ real community results\*\*', f'**{total_count}+ real community results**', stext)
+        with open(os.path.join(REPO_DIR, 'SKILL.md'), 'w', encoding='utf-8') as f:
+            f.write(stext)
+    
+    # Sync query script
+    query_src = os.path.expanduser('~/.hermes/skills/ai-automation/seedance-prompts/scripts/seedance_query.py')
+    if os.path.exists(query_src):
+        with open(query_src) as f_in, open(os.path.join(REPO_DIR, 'scripts', 'seedance_query.py'), 'w') as f_out:
+            f_out.write(f_in.read())
+    
+    # Sync scraper script
+    scraper_src = os.path.expanduser('~/.hermes/skills/ai-automation/seedance-prompts/scripts/seedance_scraper.py')
+    if os.path.exists(scraper_src):
+        with open(scraper_src) as f_in, open(os.path.join(REPO_DIR, 'scripts', 'seedance_scraper.py'), 'w') as f_out:
+            f_out.write(f_in.read())
+
+    # Commit & push
+    try:
+        subprocess.run(['git', 'add', '-A'], cwd=REPO_DIR, check=True)
+        status = subprocess.run(['git', 'status', '--porcelain'], cwd=REPO_DIR, capture_output=True, text=True)
+        if status.stdout.strip():
+            msg = f"auto: updated database stats (+{new_count} new prompts, total {total_count:,})"
+            subprocess.run(['git', 'commit', '-m', msg], cwd=REPO_DIR, check=True)
+            push_url = f"https://{user}:{token}@github.com/{user}/seedance-prompts.git"
+            res = subprocess.run(['git', 'push', push_url, 'main'], cwd=REPO_DIR, capture_output=True, text=True)
+            if res.returncode == 0:
+                print(f"Auto-pushed to GitHub: +{new_count} new prompts (total {total_count:,})")
+    except Exception as e:
+        print(f"Auto-push error: {e}")
+
+
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else 'update'
     
@@ -189,7 +256,6 @@ def main():
     if mode == 'update':
         to_fetch = [u for u in all_urls if u not in existing]
         if not to_fetch:
-            # Silent — no output means cron stays quiet
             conn.close()
             return
     else:
@@ -209,9 +275,11 @@ def main():
     
     conn.commit()
     
+    total = conn.execute('SELECT count(*) FROM prompts').fetchone()[0]
+    
     if success > 0:
-        total = conn.execute('SELECT count(*) FROM prompts').fetchone()[0]
         print(f"Seedance DB updated: +{success} new prompts (total: {total})")
+        auto_push_github(success, total)
     
     conn.close()
 
