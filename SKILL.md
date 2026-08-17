@@ -68,13 +68,29 @@ From the matching prompts, extract:
 
 Apply top benchmark patterns from the DB data:
 
+#### Master Cinematic Multi-Shot Structure (Recommended Format)
+When writing complex multi-shot, narrative, or physical action video prompts, organize the prompt into clear explicit sections:
+1. **SCENE CONTEXT**: Short narrative high-level summary.
+2. **ACTIVE REFERENCES**: Precise `<<<image_N>>>` tags mapping image roles (identity, prop, environment).
+3. **CHARACTER ANCHOR**: Detailed physical specs, outfit, armor lock, skin texture, and current battle-worn state.
+4. **FIRST FRAME AND SPATIAL BLOCKING**: First frame composition, initial action, and ground coverage.
+5. **FORMAT MODE**: Shot transition type (e.g. HARD CUT, single take).
+6. **OPTICS**: Exact FOV (e.g. 84° wide-angle lens lock).
+7. **CAMERA — SHOT A / SHOT B**: Detailed continuous camera trajectory and tracking behavior.
+8. **ACTION TIMING — SHOT A / SHOT B**: Exact timestamp breakdowns (0:00-0:02, 0:02-0:03, etc.).
+9. **PHYSICS & COLLISION**: Dynamic mass, weight transfer, and real-time plant/environment collision rules.
+10. **LIGHTING**: Color temperature (e.g. ~6500K), mood, reflection quality.
+11. **AUDIO (BINAURAL 3D ASMR)**: Micro-acoustic details (footsteps, armor friction, respiration, impact sounds).
+12. **POSITIVE & NEGATIVE CONSTRAINTS**: Strict exclusions (e.g., no dirt path, no pre-flattened vegetation).
+
 #### 5 Elite Optimization Techniques
 1. **Structured Timestamp Protocol (`0-5s:`, `5-10s:`, `10-15s:`)**
    - Seedance 2.5 excels at multi-beat timing when explicitly segmented by timestamps.
-2. **Anchor Lock Syntax (`@1`, `@2`, `[Global Config]`)**
+2. **Anchor Lock Syntax (`@1`, `@2`, `[Global Config]`, `<<<image_N>>>`)**
    - Lock character face (`@1`) and clothing/assets (`@2`) across shots for character consistency.
-3. **Bilingual / Native Technical Markers**
-   - Seedance 2.5 is native Chinese. Injecting camera terms (`一镜到底` = one-take, `斯坦尼康` = Steadicam, `浅景深` = shallow DOF) increases camera tracking compliance by 15-20%.
+   - For image references, use triple angle brackets `<<<image_1>>>`, `<<<image_2>>>`, `<<<image_3>>>` to reference uploaded input images directly.
+3. **Temporal Vegetation Lock & Real-Time Collision**
+   - Explicitly instruct that 100% of vegetation/environment stays upright/pristine until the exact millisecond of physical contact to avoid AI pre-flattened path errors.
 4. **Physical Texture & Friction Anchors**
    - Always specify 3 physical elements: **contact points** (footsteps, grip), **weight/friction** (gravity, momentum, fabric inertia), and **lighting direction** (single dominant light source).
 5. **Prompt Evaluation & Scoring**
