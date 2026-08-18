@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Smart Seedance prompt query & evaluator — searches DB, analyzes patterns, scores prompts.
+Works with 7,000+ multi-source community prompts from bestseedanceprompts.com and seedance2prompts.com.
 
 Usage:
   python3 seedance_query.py "cinematic night market scene"
@@ -52,7 +53,8 @@ def search_prompts(query, limit=5, model=None, workflow=None, category=None):
         sql += ' AND p.workflow LIKE ?'
         params.append(f'%{workflow}%')
     if category:
-        sql += ' AND p.categories LIKE ?'
+        sql += ' AND (p.categories LIKE ? OR p.settings LIKE ?)'
+        params.append(f'%{category}%')
         params.append(f'%{category}%')
     
     sql += ' ORDER BY rank LIMIT ?'
@@ -93,7 +95,9 @@ def analyze_patterns(prompts):
     all_cats = []
     for p in prompts:
         try:
-            all_cats.extend(json.loads(p.get('categories', '[]')))
+            cats = json.loads(p.get('categories', '[]'))
+            if isinstance(cats, list):
+                all_cats.extend(cats)
         except:
             pass
     analysis['top_categories'] = dict(Counter(all_cats).most_common(5))
@@ -135,7 +139,7 @@ def analyze_patterns(prompts):
     paragraph = 0
     for p in prompts:
         text = (p.get('original_prompt', '') or '')
-        if any(marker in text for marker in ['Main Subject:', 'Location:', 'Camera:', 'Action:', 'Setting:', '0-5s', '@1']):
+        if any(marker in text for marker in ['Main Subject:', 'Location:', 'Camera:', 'Action:', 'Setting:', '0-5s', '@1', '【']):
             structured += 1
         else:
             paragraph += 1
@@ -163,23 +167,23 @@ def score_prompt(text):
     feedback = []
     
     # 1. Word Count & Length Adequacy (15 pts)
-    if words >= 150 and words <= 550:
+    if words >= 150 and words <= 650:
         breakdown['length'] = 15
     elif words >= 80 and words < 150:
         breakdown['length'] = 10
         feedback.append("Consider expanding details (optimal Seedance 2.5 length is 150–500 words).")
-    elif words > 550 and words <= 900:
+    elif words > 650 and words <= 1000:
         breakdown['length'] = 12
-    elif words > 900:
+    elif words > 1000:
         breakdown['length'] = 8
-        feedback.append("Prompt is very long (>900 words). Seedance may ignore trailing instructions.")
+        feedback.append("Prompt is very long (>1000 words). Seedance may ignore trailing instructions.")
     else:
         breakdown['length'] = 5
         feedback.append("Prompt is too brief (<80 words). Add physical appearance, camera, and lighting specifics.")
         
     # 2. Subject & Texture Detail (20 pts)
     sub_score = 0
-    subject_kw = ['wearing', 'dress', 'shirt', 'jacket', 'hair', 'skin', 'eyes', 'facial', 'texture', 'fabric', 'color', 'age', 'apparel', 'outfit']
+    subject_kw = ['wearing', 'dress', 'shirt', 'jacket', 'hair', 'skin', 'eyes', 'facial', 'texture', 'fabric', 'color', 'age', 'apparel', 'outfit', '体型', '发型', '服装']
     matches_sub = sum(1 for kw in subject_kw if kw in text.lower())
     sub_score = min(20, matches_sub * 4)
     breakdown['subject_detail'] = sub_score
@@ -188,7 +192,7 @@ def score_prompt(text):
         
     # 3. Camera Directives & Framing (20 pts)
     cam_score = 0
-    cam_kw = ['pan', 'tilt', 'dolly', 'tracking', 'handheld', 'steadicam', 'crane', 'drone', 'pov', 'close-up', 'wide shot', 'medium shot', 'orbit', 'zoom', 'angle', '镜头', '一镜到底', '拉近', '推镜']
+    cam_kw = ['pan', 'tilt', 'dolly', 'tracking', 'handheld', 'steadicam', 'crane', 'drone', 'pov', 'close-up', 'wide shot', 'medium shot', 'orbit', 'zoom', 'angle', '镜头', '一镜到底', '拉近', '推镜', '俯拍', '仰拍']
     matches_cam = sum(1 for kw in cam_kw if kw in text.lower())
     cam_score = min(20, matches_cam * 5)
     breakdown['camera_directives'] = cam_score
@@ -197,7 +201,7 @@ def score_prompt(text):
 
     # 4. Physical Realism & Friction Anchors (15 pts)
     phys_score = 0
-    phys_kw = ['light', 'lighting', 'shadow', 'reflection', 'sunlight', 'neon', 'glow', 'contrast', 'contact', 'footstep', 'dust', 'gravity', 'weight', 'wind', 'reflection', 'ground', 'moisture', 'smoke']
+    phys_kw = ['light', 'lighting', 'shadow', 'reflection', 'sunlight', 'neon', 'glow', 'contrast', 'contact', 'footstep', 'dust', 'gravity', 'weight', 'wind', 'reflection', 'ground', 'moisture', 'smoke', '光影', '水花', '脚步']
     matches_phys = sum(1 for kw in phys_kw if kw in text.lower())
     phys_score = min(15, matches_phys * 3)
     breakdown['physical_anchors'] = phys_score
@@ -206,8 +210,8 @@ def score_prompt(text):
 
     # 5. Timeline / Beat Control (15 pts)
     time_score = 0
-    has_timestamps = bool(re.search(r'\b\d+[-–]\d+s\b', text) or re.search(r'Scene \d+|Beat \d+|Phase \d+', text, re.I))
-    has_sections = bool(re.search(r'\b(Subject|Location|Camera|Setting|Action|Style):', text, re.I))
+    has_timestamps = bool(re.search(r'\b\d+[-–:]\d+s?\b', text) or re.search(r'Scene \d+|Beat \d+|Phase \d+|【\d+[:：]', text, re.I))
+    has_sections = bool(re.search(r'\b(Subject|Location|Camera|Setting|Action|Style|Format):', text, re.I) or '【' in text)
     if has_timestamps:
         time_score = 15
     elif has_sections:
@@ -222,9 +226,9 @@ def score_prompt(text):
 
     # 6. Advanced Anchors & Technical Precision (15 pts)
     adv_score = 0
-    has_anchors = bool(re.search(r'@\d+', text)) # Anchor tags @1, @2
+    has_anchors = bool(re.search(r'@[1-9]|@图片', text)) # Anchor tags @1, @2, @图片
     has_chinese_terms = bool(re.search(r'[\u4e00-\u9fff]', text))
-    has_quality_markers = any(q in text.lower() for q in ['cinematic', '35mm', 'minidv', 'photorealistic', 'shallow depth of field', 'grain', 'bokeh', '16:9', '4k'])
+    has_quality_markers = any(q in text.lower() for q in ['cinematic', '35mm', 'minidv', 'photorealistic', 'shallow depth of field', 'grain', 'bokeh', '16:9', '4k', '720p', '1080p'])
     
     if has_anchors:
         adv_score += 5
@@ -280,9 +284,19 @@ def format_results(prompts, analysis, query):
     
     output.append("\n### Matching Prompts")
     for i, p in enumerate(prompts, 1):
+        source = 'seedance2prompts.com' if 'seedance2prompts' in p['url'] else 'bestseedanceprompts.com'
         output.append(f"\n---\n#### [{i}] {p['title']} ({p['model']}, {p['workflow']})")
-        output.append(f"**Words:** {p['word_count']} | **Categories:** {p.get('categories', '[]')}")
+        output.append(f"**Source:** {source} | **Provenance:** {p.get('provenance', 'N/A')}")
+        output.append(f"**Words:** {p['word_count']} ({p['char_count']} chars) | **Categories:** {p.get('categories', '[]')}")
         
+        # Check settings for video URL
+        try:
+            st = json.loads(p.get('settings', '{}'))
+            if st.get('video_url'):
+                output.append(f"**Video Demo:** {st['video_url']}")
+        except:
+            pass
+            
         prompt_text = p.get('original_prompt', '')
         if len(prompt_text) > 1500:
             output.append(f"\n```\n{prompt_text[:1500]}...\n[truncated — {len(prompt_text)} chars total]\n```")
@@ -293,17 +307,31 @@ def format_results(prompts, analysis, query):
 
 
 def get_stats():
-    """DB statistics."""
+    """DB statistics with multi-source overview."""
     conn = get_conn()
     
     total = conn.execute('SELECT count(*) FROM prompts').fetchone()[0]
+    
+    # Sources
+    sources = conn.execute('''
+        SELECT 
+            CASE 
+                WHEN url LIKE '%seedance2prompts%' THEN 'seedance2prompts.com'
+                ELSE 'bestseedanceprompts.com'
+            END as src,
+            count(*)
+        FROM prompts GROUP BY src
+    ''').fetchall()
+    
     models = conn.execute('SELECT model, count(*), avg(word_count), max(word_count) FROM prompts GROUP BY model').fetchall()
     workflows = conn.execute('SELECT workflow, count(*) FROM prompts GROUP BY workflow').fetchall()
     
     all_cats = []
     for row in conn.execute('SELECT categories FROM prompts'):
         try:
-            all_cats.extend(json.loads(row[0]))
+            cats = json.loads(row[0])
+            if isinstance(cats, list):
+                all_cats.extend(cats)
         except:
             pass
     cat_counts = Counter(all_cats).most_common(20)
@@ -324,21 +352,24 @@ def get_stats():
     
     conn.close()
     
-    print(f"## Seedance Prompts DB Stats")
-    print(f"\nTotal prompts: {total}")
+    print(f"## Seedance Multi-Source Prompts DB Stats")
+    print(f"\nTotal prompts in DB: {total:,}")
+    print(f"\n### Sources:")
+    for src, count in sources:
+        print(f"  - {src}: {count:,} prompts ({count/total*100:.1f}%)")
     print(f"\n### Models:")
     for model, count, avg_wc, max_wc in models:
-        print(f"  {model}: {count} prompts (avg {avg_wc:.0f} words, max {max_wc})")
+        print(f"  - {model}: {count:,} prompts (avg {avg_wc:.0f} words, max {max_wc})")
     print(f"\n### Workflows:")
     for wf, count in workflows:
-        print(f"  {wf}: {count}")
+        print(f"  - {wf}: {count:,}")
     print(f"\n### Word Count Distribution:")
     for bracket, count in wc_dist:
-        bar = '#' * (count // 3)
-        print(f"  {bracket:>10}: {count:>4} {bar}")
+        bar = '#' * max(1, count // 40)
+        print(f"  {bracket:>10}: {count:>5} {bar}")
     print(f"\n### Top Categories:")
     for cat, count in cat_counts:
-        print(f"  {cat}: {count}")
+        print(f"  - {cat}: {count:,}")
 
 
 def get_random(n=5):
@@ -403,7 +434,9 @@ def main():
         all_cats = []
         for row in conn.execute('SELECT categories FROM prompts'):
             try:
-                all_cats.extend(json.loads(row[0]))
+                cats = json.loads(row[0])
+                if isinstance(cats, list):
+                    all_cats.extend(cats)
             except:
                 pass
         conn.close()

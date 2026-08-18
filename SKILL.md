@@ -1,6 +1,6 @@
 ---
 name: seedance-prompts
-version: 1.0.0
+version: 1.1.0
 description: "Use when writing Seedance 2.0/2.5 video prompts."
 tags: [seedance, video, ai-video, prompts, bytedance, dreamina]
 author: Raphael
@@ -8,7 +8,7 @@ author: Raphael
 
 # Seedance Prompt Engineering Skill
 
-Write production-ready Seedance 2.0/2.5 video prompts by learning from **1500+ real community results** stored in a local SQLite DB with FTS5 search.
+Write production-ready Seedance 2.0/2.5 video prompts by learning from **7,200+ real community results** indexed across `bestseedanceprompts.com` and `seedance2prompts.com` stored in a local SQLite DB with FTS5 search.
 
 ## When to Use
 
@@ -21,9 +21,9 @@ Write production-ready Seedance 2.0/2.5 video prompts by learning from **1500+ r
 ## Architecture
 
 ```
-~/.hermes/data/seedance_prompts.db   ← SQLite + FTS5 (1500+ prompts)
+~/.hermes/data/seedance_prompts.db   ← SQLite + FTS5 (7,200+ prompts from 2 sources)
 scripts/seedance_query.py            ← Smart query: intent → DB → patterns → prompt
-scripts/seedance_scraper.py          ← Scraper (cron auto-update daily)
+scripts/seedance_scraper.py          ← Multi-source scraper (cron auto-update daily)
 ```
 
 ## Workflow
@@ -32,10 +32,10 @@ scripts/seedance_scraper.py          ← Scraper (cron auto-update daily)
 
 Parse what the user wants to create:
 - **Subject**: person, animal, object, scene
-- **Style**: cinematic, anime, vlog, commercial, horror, etc.
-- **Action**: what happens in the video
-- **Mood**: tone, atmosphere
-- **Technical**: duration, aspect ratio, camera work
+- **Style**: cinematic, anime, vlog, commercial, horror, sci-fi, etc.
+- **Action**: what happens in the video (one continuous shot vs multi-beat)
+- **Mood**: tone, atmosphere, color palette
+- **Technical**: duration (5s/10s/15s/30s), aspect ratio (16:9, 9:16), camera work, resolution (720p/1080p)
 
 ### 2. Query the DB
 
@@ -46,7 +46,7 @@ python3 ~/.hermes/skills/ai-automation/seedance-prompts/scripts/seedance_query.p
 ```
 
 This returns:
-- Top 5 matching prompts (FTS5 ranked)
+- Top 5 matching prompts (FTS5 ranked) with provenance & video demo links
 - **Pattern analysis**: common structures, word counts, camera directions
 - **Style signals**: what techniques top prompts use
 
@@ -57,40 +57,24 @@ From the matching prompts, extract:
 | Element | Look For |
 |---------|----------|
 | **Opening** | How do top prompts start? (subject intro, scene setting, camera direction) |
-| **Structure** | Single paragraph vs. sectioned (Subject/Setting/Action/Camera) |
+| **Structure** | Single paragraph vs. sectioned (Subject/Setting/Action/Camera/Timestamps) |
 | **Detail level** | Word count, specificity of descriptions |
-| **Camera language** | Pan, dolly, tracking, handheld, crane, drone, POV |
-| **Temporal cues** | "slow motion", "time-lapse", "continuous shot", beat timing |
-| **Style markers** | Film stock references, color grading terms, era aesthetics |
+| **Camera language** | Pan, dolly, tracking, handheld, crane, drone, POV, orbit |
+| **Temporal cues** | "slow motion", "time-lapse", "continuous shot", beat timing (`0-5s:`) |
+| **Style markers** | Film stock references, color grading terms, era aesthetics (35mm, MiniDV) |
 | **Ending** | How prompts close (final beat, camera pull, freeze) |
 
 ### 4. Write & Optimize the Prompt
 
 Apply top benchmark patterns from the DB data:
 
-#### Master Cinematic Multi-Shot Structure (Recommended Format)
-When writing complex multi-shot, narrative, or physical action video prompts, organize the prompt into clear explicit sections:
-1. **SCENE CONTEXT**: Short narrative high-level summary.
-2. **ACTIVE REFERENCES**: Precise `<<<image_N>>>` tags mapping image roles (identity, prop, environment).
-3. **CHARACTER ANCHOR**: Detailed physical specs, outfit, armor lock, skin texture, and current battle-worn state.
-4. **FIRST FRAME AND SPATIAL BLOCKING**: First frame composition, initial action, and ground coverage.
-5. **FORMAT MODE**: Shot transition type (e.g. HARD CUT, single take).
-6. **OPTICS**: Exact FOV (e.g. 84° wide-angle lens lock).
-7. **CAMERA — SHOT A / SHOT B**: Detailed continuous camera trajectory and tracking behavior.
-8. **ACTION TIMING — SHOT A / SHOT B**: Exact timestamp breakdowns (0:00-0:02, 0:02-0:03, etc.).
-9. **PHYSICS & COLLISION**: Dynamic mass, weight transfer, and real-time plant/environment collision rules.
-10. **LIGHTING**: Color temperature (e.g. ~6500K), mood, reflection quality.
-11. **AUDIO (BINAURAL 3D ASMR)**: Micro-acoustic details (footsteps, armor friction, respiration, impact sounds).
-12. **POSITIVE & NEGATIVE CONSTRAINTS**: Strict exclusions (e.g., no dirt path, no pre-flattened vegetation).
-
 #### 5 Elite Optimization Techniques
-1. **Structured Timestamp Protocol (`0-5s:`, `5-10s:`, `10-15s:`)**
+1. **Structured Timestamp Protocol (`0-5s:`, `5-10s:`, `10-15s:`, `15-30s:`)**
    - Seedance 2.5 excels at multi-beat timing when explicitly segmented by timestamps.
-2. **Anchor Lock Syntax (`@1`, `@2`, `[Global Config]`, `<<<image_N>>>`)**
+2. **Anchor Lock Syntax (`@1`, `@2`, `[Global Config]`, `@图片1`)**
    - Lock character face (`@1`) and clothing/assets (`@2`) across shots for character consistency.
-   - For image references, use triple angle brackets `<<<image_1>>>`, `<<<image_2>>>`, `<<<image_3>>>` to reference uploaded input images directly.
-3. **Temporal Vegetation Lock & Real-Time Collision**
-   - Explicitly instruct that 100% of vegetation/environment stays upright/pristine until the exact millisecond of physical contact to avoid AI pre-flattened path errors.
+3. **Bilingual / Native Technical Markers**
+   - Seedance 2.5 is native Chinese. Injecting camera terms (`一镜到底` = one-take, `斯坦尼康` = Steadicam, `浅景深` = shallow DOF, `俯拍` / `仰拍`) increases camera tracking compliance by 15-20%.
 4. **Physical Texture & Friction Anchors**
    - Always specify 3 physical elements: **contact points** (footsteps, grip), **weight/friction** (gravity, momentum, fabric inertia), and **lighting direction** (single dominant light source).
 5. **Prompt Evaluation & Scoring**
@@ -111,14 +95,14 @@ When writing complex multi-shot, narrative, or physical action video prompts, or
 9. **Optimal length**:
    - Seedance 2.0: 30-300 words (median ~109)
    - Seedance 2.5 text-to-video: 100-500 words (median ~342)  
-   - Seedance 2.5 image-to-video: 200-900 words (median ~399)
+   - Seedance 2.5 image-to-video / R2V: 200-900 words (median ~399)
 10. **End with a beat** — describe the final frame/moment
 
 **Workflow Modes:**
-- `Text to video` — most common (1326 prompts). Pure text, no reference needed.
+- `Text to video` — most common (6,900+ prompts). Pure text, no reference needed.
+- `Reference to video (R2V)` — character/style reference + multi-shot narrative (170+ prompts).
 - `Image to video` — provide reference image + motion prompt (97 prompts).
-- `Reference to video` — character/style reference + scene description (74 prompts).
-- `Video editing` — edit/extend existing video (3 prompts).
+- `One-take (30s)` — continuous camera movement without hard cuts.
 
 ### 5. Output Format
 
@@ -135,7 +119,7 @@ Always output:
 
 ---
 
-**Pattern source:** Based on [N] similar prompts from DB
+**Pattern source:** Based on [N] similar prompts from DB (7,200+ corpus)
 **Key patterns applied:** [list 2-3 specific techniques borrowed]
 ```
 
@@ -146,37 +130,37 @@ prompts (
   url TEXT PRIMARY KEY,
   title TEXT,
   model TEXT,            -- "Seedance 2.0" or "Seedance 2.5"
-  workflow TEXT,          -- "Text to video", "Image to video", "Reference to video"
+  workflow TEXT,          -- "Text to video", "Image to video", "Reference to video", etc.
   original_prompt TEXT,   -- The actual prompt text
   description TEXT,
-  categories TEXT,        -- JSON array: ["Action & Fight Scenes", "Cinematic & Film"]
-  settings TEXT,          -- JSON: {duration, resolution, aspect_ratio, ...}
+  categories TEXT,        -- JSON array: ["Action & Fight", "Cinematic"]
+  settings TEXT,          -- JSON: {language, date_published, video_url, thumbnail_url, ...}
+  provenance TEXT,        -- Source / Author link (e.g. X.com link or domain)
   word_count INTEGER,
   char_count INTEGER
 )
 -- FTS5 index on: title, original_prompt, description, categories
 ```
 
-## Categories (with counts)
+## Top Categories (7,200+ Prompts)
 
 | Category | Count |
 |----------|-------|
-| Action & Fight Scenes | 1219 |
-| Commercial & Product | 771 |
-| Cinematic & Film | 603 |
-| Anime & Manga | 547 |
-| Music & Dance | 507 |
-| Romance & Drama | 440 |
-| Nature & Animals | 366 |
-| Dark Fantasy & Horror | 214 |
-| Sci-Fi & Cyberpunk | 203 |
-| Tutorials & Tips | 115 |
-| Historical & Cultural | 104 |
-| Comedy & Satire | 98 |
+| Action & Fight Scenes | 2,780+ |
+| Sci-Fi & Fantasy | 1,200+ |
+| Commercial & Product | 1,220+ |
+| Cinematic & Film | 1,200+ |
+| Anime & Manga / 2D | 1,070+ |
+| Music & Dance | 500+ |
+| Romance & Drama | 440+ |
+| Vlog & Lifestyle | 390+ |
+| Character & Portrait | 370+ |
+| Short Film & Narrative | 360+ |
+| Nature & Animals | 730+ |
 
 ## Auto-Update
 
-Cron job runs daily to scrape new prompts:
+Cron job runs daily to scrape new prompts from all indexed sources:
 ```bash
 python3 ~/.hermes/skills/ai-automation/seedance-prompts/scripts/seedance_scraper.py update
 ```
@@ -186,5 +170,5 @@ python3 ~/.hermes/skills/ai-automation/seedance-prompts/scripts/seedance_scraper
 1. **Don't copy prompts verbatim** — use them as pattern references, adapt to user's concept
 2. **Long ≠ better** — Seedance 2.0 prefers concise; 2.5 can handle detail but still needs focus
 3. **Camera + action must be physically consistent** — don't describe impossible camera paths
-4. **Reference images require separate handling** — prompt structure differs for img2vid
+4. **Reference images require separate handling** — prompt structure differs for img2vid / R2V
 5. **Community results ≠ guaranteed** — results vary by seed, model version, and platform state
