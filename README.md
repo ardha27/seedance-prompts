@@ -4,12 +4,12 @@
 
 <p align="center">
   <b>ByteDance Seedance 2.0 & 2.5 Prompt Engineering & Benchmark Toolkit</b><br />
-  SQLite + FTS5 full-text search engine over <b>7,291+ real community video production cards</b>.
+  SQLite + FTS5 full-text search engine over <b>7,350+ real community video production cards</b>.
 </p>
 
 <p align="center">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" /></a>
-  <a href="#features"><img alt="Prompts Indexed" src="https://img.shields.io/badge/prompts-7291%2B-111?style=flat-square" /></a>
+  <a href="#features"><img alt="Prompts Indexed" src="https://img.shields.io/badge/prompts-7350%2B-111?style=flat-square" /></a>
   <a href="#quick-start"><img alt="Models Supported" src="https://img.shields.io/badge/seedance-2.0%20%7C%202.5-purple?style=flat-square" /></a>
   <a href="#quick-start"><img alt="Python" src="https://img.shields.io/badge/python-3.8%2B-green?style=flat-square" /></a>
 </p>
@@ -69,7 +69,7 @@ python3 scripts/seedance_query.py --score "A young woman in a teal apron walking
 
 | Metric | Count / Value |
 |--------|---------------|
-| **Total Prompts** | **7,291** |
+| **Total Prompts** | **7,350** |
 | **Seedance 2.5** | 1,169 (avg 342 words) |
 | **Seedance 2.0** | 331 (avg 109 words) |
 | **Text-to-Video** | 1,326 |
